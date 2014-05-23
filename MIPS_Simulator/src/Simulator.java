@@ -1,5 +1,6 @@
 /*The main program that represents the simulator*/
 import java.io.BufferedReader;
+import java.util.Arrays;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -10,8 +11,14 @@ public class Simulator {
 	private BufferedReader reader;
 	private Registers Regs;
 	private Memory mem;
-	int rs,rt,rd,im;
-	String type,inx;
+	int rs,rt,rd;
+	int[] temp3;
+	int imm,address,val_from_mem;
+	//short imm;
+	static int total_inx, logic_count,a_count,mem_count, control_count,base;
+	String[] temp_Array;
+	String type,inx,mem_val,temp,temp2, op1,op2;
+	static boolean halt = false;
 	public Simulator() throws IOException{
 		Regs = new Registers();
 		mem = new Memory("./src/file.txt");
@@ -20,189 +27,308 @@ public class Simulator {
 	
 	public static void main(String args[]) throws IOException{
 		Simulator f = new Simulator();
-		for(int i=0;i<4;i++){
-			String inx = f.inx_Fetch(f.Regs.PC); //fetch the next instruction from the memory
-			System.out.println(inx);			  
-			f.ParseInx(inx);					//Decode the instruction 
+			while(halt==false){
+			//for(int i=0;i<2;i++){
+			int[] inx = f.inx_Fetch(f.Regs.getPC()); //fetch the next instruction from the memory
+			f.ParseInx(Arrays.toString(inx));	//Decode the instruction 
 			f.Regs.incrementPC();				//increment PC to point to 
-			
-		}
+			}
+		
 		
 		
 	}
 	
 	//Convert String instruction to binary
-	public String ToBinary(String line){
-		StringBuilder sb = new StringBuilder();
-		String result = new BigInteger(line,16).toString(2);
-		for(int i=32-result.length();i>0;i--){
-			sb.append('0');
-		}
-		sb.append(result);
-		return sb.toString();
-	}
-	
-	
 	//Get instruction from memory address
-	public String inx_Fetch(int address){
-		String inx = this.mem.getValue(address);
-		return inx;
+	public int[] inx_Fetch(int address){
+		int[] result;
+		result = this.mem.fetchFromMem(address);
+		return result;
 	}
 	
 	//Parse the binary instruction to decode it
 	public void ParseInx(String inx){
-		String binary_inx = this.ToBinary(inx);
-		System.out.println(binary_inx);
-		String opcode = binary_inx.subSequence(0, 6).toString();
+		String binary_inx = inx; //Memory.ToBinary(inx);
+		System.out.println(inx);
+		String[] result;
+		int value, dec_value,reg_value ;
+		int[] decimal_result,val_from_memory;
+		String opcode=getOpcode(inx);		//decode
 		switch(opcode) {
 		
-		// Add rd rs rt
+		//ADD
 		case "000000":
-			System.out.println(opcode);
+			System.out.println(opcode);				//result = string[], decimal_result = int[] 
 			type = "R";
-			decode(binary_inx, type);
-			Regs.setValue(rd, Regs.R[rs]+Regs.R[rt]);
-			System.out.println(Regs.R[rd]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[2],2).toString(10));
+			op1= Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"add");
+			mem.fetchFromMem(0);
+			WriteBack(rd,value,true);
+			a_count++;
+			total_inx++;
 			break;
 			
-		//Addi rt rs im	
+		//ADDI	
 		case "000001":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);
-			Regs.setValue(rt, Regs.R[rs]+im);
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			System.out.println("value of imm"+imm);
+			value = inx_Execute(op1,null,result[2],"addi");
+			mem.fetchFromMem(0);
+			WriteBack(rd, value,true);
+			a_count++;
+			total_inx++;
 			break;
 		
-		//Sub rd rs rt	
+		//SUB	
 		case "000010":
-			System.out.println(opcode);
 			type="R";
-			decode(binary_inx,type);
-			Regs.setValue(rd, Regs.R[rs]-Regs.R[rt]);
-			System.out.println(Regs.R[rd]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[2],2).toString(10));
+			op1= Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"sub");
+			mem.fetchFromMem(0);
+			WriteBack(rd,value,true);
+			a_count++;
+			total_inx++;
 			break;
 			
-		//Subi rt rs imm		
+		//SUBI	
 		case "000011":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);
-			Regs.setValue(rt, Regs.R[rs]-im);
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			value = inx_Execute(op1,null,result[2],"subi");
+			mem.fetchFromMem(0);
+			WriteBack(rd, value,true);
+			a_count++;
+			total_inx++;
 			break;
-			
-		//Mul rd rs rt	
+		
+		//MUL
 		case "000100":
-			System.out.println(opcode);
 			type="R";
-			decode(binary_inx, type);
-			Regs.setValue(rd, Regs.R[rs] * Regs.R[rt]);
-			System.out.println(Regs.R[rd]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd  = Integer.parseInt(new BigInteger(result[2],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"mul");
+			mem.fetchFromMem(0);
+			WriteBack(rd,value,true);
+			a_count++;
+			total_inx++;
 			break;
 		
-		//Muli rt rs imm
+		//MULI
 		case "000101":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);
-			Regs.setValue(rt, Regs.R[rs] * im);
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			value = inx_Execute(op1,null,result[2],"multi");
+			mem.fetchFromMem(0);
+			WriteBack(rd, value,true);
+			a_count++;
+			total_inx++;
 			break;
 		
-		//AND rd rs rt	
+		
+		//AND
 		case "000110":
-			System.out.println(opcode);
 			type="R";
-			decode(binary_inx, type);
-			Regs.setValue(rd, Regs.R[rs] & Regs.R[rt]);
-			System.out.println(Regs.R[rd]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[2],2).toString(10));
+			op1= Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"and");
+			mem.fetchFromMem(0);
+			WriteBack(rd,value,true);
+			logic_count++;
+			total_inx++;
+			
 			break;
 		
-		//ANDi rt rs imm	
+		//ANDI
 		case "000111":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);
-			Regs.setValue(rt, Regs.R[rs] & im);
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			value = inx_Execute(op1,null,result[2],"andi");
+			mem.fetchFromMem(0);
+			WriteBack(rd, value,true);
+			logic_count++;
+			total_inx++;
 			break;
-			
-		//OR rd rs rt		
+		
+		//OR
 		case "001000":
-			System.out.println(opcode);
 			type="R";
-			decode(binary_inx, type);
-			Regs.setValue(rd, Regs.R[rs] | Regs.R[rt]);
-			System.out.println(Regs.R[rd]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[2],2).toString(10));
+			op1= Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"or");
+			mem.fetchFromMem(0);
+			WriteBack(rd,value,true);
+			logic_count++;
+			total_inx++;
 			break;
 		
-		//ORi rt rs imm		
+		//ORI
 		case "001001":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);
-			Regs.setValue(rt, Regs.R[rs] | im);
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			value = inx_Execute(op1,null,result[2],"ori");
+			mem.fetchFromMem(0);
+			WriteBack(rd, value,true);
+			logic_count++;
+			total_inx++;
 			break;
-		
-		//XOR rd rs rt	
+			
+		//XOR
 		case "001010":
-			System.out.println(opcode);
 			type="R";
-			decode(binary_inx, type);
-			Regs.setValue(rd, Regs.R[rs] ^ Regs.R[rt]);
-			System.out.println(Regs.R[rd]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[2],2).toString(10));
+			op1= Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"xor");
+			mem.fetchFromMem(0);
+			WriteBack(rd,value,true);
+			logic_count++;
+			total_inx++;
+			
 			break;
 		
-		//XORi rt rs imm		
+		//XORI
 		case "001011":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);
-			Regs.setValue(rt, Regs.R[rs] ^ im);
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			value = inx_Execute(op1,null,result[2],"subi");
+			mem.fetchFromMem(0);
+			WriteBack(rd, value,true);
+			logic_count++;
+			total_inx++;
 			break;
 			
-		//LDW Rt Rs Imm	
+		
+		//LDW
 		case "001100":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);	
-			Regs.setValue(rt, Memory.getValue(Regs.R[rs] + im));
-			System.out.println(Regs.R[rt]);
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			value = inx_Execute(op1,null, result[2],"add");
+			int[] val_from_mem = mem.fetchFromMem(value);
+			String temp = Arrays.toString(val_from_mem);
+			String[] temp_Array = temp.substring(1,temp.length()-1).split(", ");
+			for(int i=0;i<temp_Array.length;i++){
+				mem_val+=temp_Array[i];
+			} 
+			dec_value = Integer.parseInt(mem_val,2);
+			WriteBack(rd, value,true);
+			mem_count++;
+			total_inx++;
 			break;
 			
-		//STW Rt Rs Imm		
+		//STW	
 		case "001101":
-			System.out.println(opcode);
 			type="I";
-			decode(binary_inx, type);	
-			Mem.setValue(Regs.R[rs] + im, Regs.R[rt]);
-			System.out.println( Memory.getValue(Regs.R[rs] + im) );
-			break;
-		
-		//BEQ Rs Rt x	
-		case "001110":
-			System.out.println("00000000");
+			result = getOperands(binary_inx,type);
+			decimal_result = get_rs_rt(result);
+			rd = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+			reg_value = Regs.getValue(rd);
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			int address = inx_Execute(op1,null, result[2], "addi");
+			mem.setMemory(address, Integer.toBinaryString(reg_value));
+			WriteBack(0,0,false);
+			mem_count++;
+			total_inx++;
 			break;
 			
-		//Bz Rs x	
+		//BEQ	
+		case "001110":
+			type="I";
+			result = getOperands(binary_inx, type);
+			decimal_result = get_rs_rt(result);
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"beq");
+			if(value==1){
+				Regs.setPC(Regs.PC+(Integer.parseInt(result[2])*32));
+			}
+			mem.fetchFromMem(0);
+			control_count++;
+			total_inx++;
+			break;
+			
+		//BZ	
 		case "001111":
-			System.out.println(opcode);
+			result = getOperands(binary_inx, type);
+			decimal_result = get_rs_rt(result);
+			op1 = Integer.toBinaryString(Regs.getValue(decimal_result[0]));
+			op2 = Integer.toBinaryString(Regs.getValue(decimal_result[1]));
+			value = inx_Execute(op1,op2,null,"bz");
+			if(value==1){
+				Regs.setPC(Regs.PC+(Integer.parseInt(result[2])*32));
+			}
+			mem.fetchFromMem(0);
+			WriteBack(0,0,false);
+			control_count++;
+			total_inx++;
 			break;
 		
-		//JR Rs	
+		//JR	
 		case "010000":
-			System.out.println(opcode);
+			result = getOperands(binary_inx, type);
+			decimal_result = get_rs_rt(result);
+			value = Regs.getValue(decimal_result[0]);
+			if(value!=0)
+				Regs.setPC((value-1)*32);
+			else
+				Regs.setPC(0);
+			mem.fetchFromMem(0);
+			WriteBack(0,0,false);
+			control_count++;
+			total_inx++;
+			halt=true;
+			System.out.println("PC is :"+Regs.getPC());
 			break;
-		
+			
 		//HALT	
 		case "010001":
-			System.out.println("00000000");
+			halt=true;
+			mem.fetchFromMem(0);
+			WriteBack(0,0,false);
+			control_count++;
+			total_inx++;
 			break;
-			
-
+				
 			
 		default:
 			break;
@@ -211,36 +337,144 @@ public class Simulator {
 	}
 	
 	//Decode the instruction based on the type = R or I"
-	public void decode(String inx, String type){
-		
-		
-		switch(type) {
 	
-		case "R":
-		String rs_binary = inx.subSequence(6, 11).toString();
-		rs = Integer.parseInt(new BigInteger(rs_binary,2).toString(10));
-		String rt_binary = inx.subSequence(11,16).toString();
-		rt = Integer.parseInt(new BigInteger(rt_binary,2).toString(10));
-		String rd_binary = inx.subSequence(16,21).toString();
-		rd = Integer.parseInt(new BigInteger(rd_binary,2).toString(10));
-		System.out.println(rs+" "+rt+ " "+ rd);
-			break;
+	public String getOpcode(String inx){
+		String[] temp = inx.substring(1,inx.length()-1).split(", ");
+		//System.out.println(temp[1]+""+temp[2]);
+		String opcode = temp[0]+temp[1]+temp[2]+temp[3]+temp[4]+temp[5];
+		return opcode;
+	}
+	
+	
+	
+	public String[] getOperands(String inx,String type){
+		String[] temp = inx.substring(1,inx.length()-1).split(", ");
+		String result[] = new String[4];
+		String first_operand = temp[6]+temp[7]+temp[8]+temp[9]+temp[10];
+		String second_operand = temp[11]+temp[12]+temp[13]+temp[14]+temp[15];
+		result[0] = first_operand;
+		result[1] = second_operand;
+		if(type.equals("R"))
+		{
+		String third_operand = temp[16]+temp[17]+temp[18]+temp[19]+temp[20];
+		result[2] = third_operand;
+		System.out.println(result[0]);
+		System.out.println(result[1]);
 		
-		case "I":
-		String rs_binary = inx.subSequence(6, 11).toString();
-		rs = Integer.parseInt(new BigInteger(rs_binary,2).toString(10));
-		String rt_binary = inx.subSequence(11,16).toString();
-		rt = Integer.parseInt(new BigInteger(rt_binary,2).toString(10));
-		//Immediate field
-		String im_binary = inx.subSequence(16,31).toString();
-		im = Integer.parseInt(new BigInteger(rd_binary,2).toString(10));
-		System.out.println(rs+" "+rt+ " "+ im);
+		}
+		else if (type.equals("I")){
+		String imm_operand = temp[16]+temp[17]+temp[18]+temp[19]+temp[20]+
+				temp[21]+temp[22]+temp[23]+temp[24]+temp[25]+temp[26]+temp[27]+temp[28]
+				+temp[29]+temp[30]+temp[31];
+		result[2] = imm_operand;
+				
+		}
+		return result;
 		
-			break;
-		
-		default:
-			break;
 	}
 
-	}
+//Binary to string
+  public int[] get_rs_rt(String[] result){
+	  int values[] = new int[2];
+	  rs = Integer.parseInt(new BigInteger(result[0],2).toString(10));
+	  rt = Integer.parseInt(new BigInteger(result[1],2).toString(10));
+	  values[0] = rs;
+	  values[1] = rt;
+	  System.out.println(values[0]+""+values[1]);
+	  return values;
+  }
+  public int inx_Execute(String a, String b, String c, String operator ){
+	  int result = 0;	
+	  short first, second;
+	  switch (operator){
+	  case "add":
+			first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+			result = first + second;
+			break;
+	  case "addi":
+		  	first = (short) Integer.parseInt(a,2);
+		  	second = (short)Integer.parseInt(new BigInteger(c,2).toString(10));
+		  	result = first + second;
+		  	//System.out.println(result);
+		  	break;
+	  case "sub":
+		    first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+			result = first - second;
+			break;
+			
+	  case "subi":
+		    first = (short) Integer.parseInt(a,2);
+		  	second = (short)Integer.parseInt(new BigInteger(c,2).toString(10));
+		  	result = first - second;
+		  	break;
+	  case "mult":
+		  	first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+			result = first * second;
+			break;
+	  case "multi":
+		    first = (short) Integer.parseInt(a,2);
+		  	second = (short)Integer.parseInt(new BigInteger(c,2).toString(10));
+		  	result = first * second;
+			break;
+	  case "and":
+		  	first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+			result = first & second;
+			break;
+	  case "andi":
+		    first = (short) Integer.parseInt(a,2);
+		  	second = (short)Integer.parseInt(new BigInteger(c,2).toString(10));
+		  	result = first & second;
+			break;
+	  case "or":
+		  	first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+			result = first | second;
+			break;
+	  case "ori":
+		  	first = (short) Integer.parseInt(a,2);
+		  	second = (short)Integer.parseInt(new BigInteger(c,2).toString(10));
+		  	result = first | second;
+			break;
+	  case "xor":
+		  	first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+			result = first ^ second;
+			break;
+	  case "xori":
+		    first = (short) Integer.parseInt(a,2);
+		  	second = (short)Integer.parseInt(new BigInteger(b,2).toString(10));
+		  	result = first ^ second;
+			break;
+			
+	  case "beq":
+		    first = (short) Integer.parseInt(a,2);
+			second = (short) Integer.parseInt(b,2);
+		    if(first == second)
+		    	result = 1;
+		    else
+		    	result = 0;
+		    
+	  case "bz":
+		   first = (short)Integer.parseInt(a,2);
+		   second = (short)Integer.parseInt(b,2);
+		   if(first == 0)
+		    	result = 1;
+		    else
+		    	result = 0;
+	  }
+	  
+	  return result;
+  }
+  
+  public void WriteBack(int a, int value, boolean flag){
+	  if(flag==true){
+	  Regs.setValue(a, value);
+	  System.out.println(Regs.getValue(a));}
+	  
+  }
+ 
 }

@@ -30,6 +30,10 @@ public class Registers {
 	
 	//Increments PC to point to next instruction in memory
 	public void incrementPC(){
-		PC=PC+4;
+		PC=PC+32;
+	}
+	
+	public void setPC(int i){
+		PC=i;
 	}
 }
