@@ -36,4 +36,10 @@ public class Registers {
 	public void setPC(int i){
 		PC=i;
 	}
+	
+	public void printAll(){
+		for(int j=0;j<32;j++){
+			System.out.println("reg "+j+" = "+R[j]);
+		}
+	}
 }

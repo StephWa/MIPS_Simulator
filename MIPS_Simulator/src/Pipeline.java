@@ -8,14 +8,10 @@ public class Pipeline {
 	
 	private Registers Regs;
 	private Memory mem;
-	int rs,rt,rd;
-	int[] temp3;
-	int imm,address,val_from_mem;
-	static int total_inx, logic_count,a_count,mem_count, control_count,base;
-	String[] temp_Array;
-	static boolean halt = false;
-	static boolean stall = false;
-	static Instruction[] stages;
+	private int rs,rt;		
+	private int total_inx, logic_count, a_count, mem_count, control_count, base;
+	private boolean halt = false;
+	private static Instruction[] stages;
 	
 	public Pipeline() throws IOException{
 		Regs = new Registers();
@@ -29,29 +25,30 @@ public class Pipeline {
 	
 	public static void main(String args[]) throws IOException{
 		Pipeline f = new Pipeline();
-		for(int i=0;i<15;i++){
+		for(int i=0;i<26;i++){
 			// IF
 			f.inx_Fetch(f.Regs.getPC());
-			System.out.println("IF");
+			//System.out.println("IF");
 			// ID
 			if(Pipeline.stages[1].getIx() != null){
-				System.out.println("ID");
+			//	System.out.println("ID");
 				f.ParseInx(Pipeline.stages[1].getIx());
 			}
 			// EXE
 			if(Pipeline.stages[2].getOpcode() != null){
-				System.out.println("EX");
+			//	System.out.println("EX");
 				f.inx_Execute(Pipeline.stages[2]);
 			}
 			// MEM
 			if(Pipeline.stages[3].getOpcode() != null){
-				System.out.println("MEM");
+			//	System.out.println("MEM");
 				f.memoryAccess(Pipeline.stages[3]);
 			}
 			// WB
 			if(Pipeline.stages[4].getOpcode() != null){
-				System.out.println("WB");
+			//	System.out.println("WB");
 				f.WriteBack(Pipeline.stages[4]);
+				Pipeline.stages[4].printAll();
 			}
 
 			// shift pipeline
@@ -64,6 +61,8 @@ public class Pipeline {
 			// increment PC to point to next instruction
 			f.Regs.incrementPC();					  	
 		}	
+		
+		f.Regs.printAll();
 	}
 	
 	//Get instruction from memory address (IF)
@@ -75,16 +74,12 @@ public class Pipeline {
 	
 	//Parse the binary instruction and decode it (ID)
 	public void ParseInx(String inx){
-		System.out.print("instruction to parse:");
-		System.out.println(inx);
 		String type;
 		String[] ops;
 		
 		// parse and set opcode
 		String opcode=getOpcode(inx);
 		stages[0].setOpcode(opcode);
-		System.out.println("opcode is:");
-		System.out.println(opcode);	
 		
 		// Determine and set instruction type
 		if((Integer.parseInt(opcode) < 001011) && Integer.parseInt(opcode)%2 == 0) {
@@ -93,18 +88,17 @@ public class Pipeline {
 			type = "I";
 		}
 		
-		System.out.println("type is:");
-		System.out.println(type);
+		//System.out.println("type is "+type);
 		stages[1].setType(type);
 		
 		// parse and set operands	
 		ops = getOperands(inx, type);
-		stages[1].setRD(ops[0]);
-		stages[1].setOpA(ops[1]);
-		stages[1].setOpB(ops[2]);	
+		stages[1].setRS(ops[0]);
+		stages[1].setRT(ops[1]);
+		stages[1].setOpC(ops[2]);	
 	}
 		
-	//Return opcode from a given instruction"
+	//Return opcode from a given instruction
 	public String getOpcode(String inx){
 		String[] temp = inx.substring(1,inx.length()-1).split(", ");
 		String opcode = temp[0]+temp[1]+temp[2]+temp[3]+temp[4]+temp[5];
@@ -114,9 +108,9 @@ public class Pipeline {
 	// Return operands for a given instruction
 	public String[] getOperands(String inx, String type){
 		String[] temp = inx.substring(1,inx.length()-1).split(", ");
-		String result[] = new String[4];
+		String result[] = new String[3];
 		
-		// Bits 6-10 are destination register, bits 11-15 are first operand
+		// Bits 6-10 are RS, bits 11-15 are RT
 		String first_operand = temp[6]+temp[7]+temp[8]+temp[9]+temp[10];
 		String second_operand = temp[11]+temp[12]+temp[13]+temp[14]+temp[15];
 		result[0] = first_operand;
@@ -124,14 +118,12 @@ public class Pipeline {
 		
 		if(type.equals("R"))
 		{
-			// bits 16-20 are second operand
+			// bits 16-20 are RD
 			String third_operand = temp[16]+temp[17]+temp[18]+temp[19]+temp[20];
 			result[2] = third_operand;
-			System.out.println("first operand is "+result[0]);
-			System.out.println("second operand is "+result[1]);
 		}
 		else if (type.equals("I")){
-			// remaining bits are second operand
+			// remaining bits are Immediate
 			String imm_operand = temp[16]+temp[17]+temp[18]+temp[19]+temp[20]+
 				temp[21]+temp[22]+temp[23]+temp[24]+temp[25]+temp[26]+temp[27]+temp[28]
 				+temp[29]+temp[30]+temp[31];
@@ -148,96 +140,93 @@ public class Pipeline {
 	  rt = Integer.parseInt(new BigInteger(result[1],2).toString(10));
 	  values[0] = rs;
 	  values[1] = rt;
-	  System.out.println("RS in decimal: "+values[0]);
-	  System.out.println("RT in decimal: "+values[1]);
+
 	  return values;
   }
   
   //Perform operation on operands (EX)
   public int inx_Execute( Instruction inx ){
 	  int result = 0;
-	  short first, second;
-	  
-	  // get operation, type and operands
 	  String opcode = inx.getOpcode();
-	  String type = inx.getType();
-	  String opA = inx.getOpA();
-	  String opB = inx.getOpB();
 
-	  // convert operands to integers
-	  first = (short) Integer.parseInt(opA,2);
-	  if(type == "R")
-		  second = (short) Integer.parseInt(opB,2);
-	  else 
-		  second = (short)Integer.parseInt(new BigInteger(opB,2).toString(10));
+	  // get values from registers
+	  short RS = (short) Regs.getValue((short) Integer.parseInt(inx.getRS(), 2));
+	  short RT = (short)Regs.getValue((short) Integer.parseInt(inx.getRT(), 2));
+	  short imm = (short)Integer.parseInt(new BigInteger(inx.getOpC(), 2).toString(10));
 	  
 	  // perform operation
 	  switch (opcode){
 	  // ADD
 	  case "000000":		
-			result = first + second;
+			result = RS + RT;
 			break;
 	  // ADDI
 	  case "000001":
-		  	result = first + second;
+		  	result = RS + imm;
 		  	break;
 	  // SUB
 	  case "000010":
-			result = first - second;
+			result = RS - RT;
 			break;
 	  // SUBI	
 	  case "000011":
-		  	result = first - second;
+		  	result = RS - imm;
 		  	break;
 	  // MUL
 	  case "000100":
-			result = first * second;
+			result = RS * RT;
 			break;
 	  // MULI
 	  case "000101":
-		  	result = first * second;
+		  	result = RS * imm;
 			break;
 	  // AND
 	  case "000110":
-			result = first & second;
+			result = RS & RT;
 			break;
 	  // ANDI
 	  case "000111":
-		  	result = first & second;
+		  	result = RS & imm;
 			break;
 	  // OR
 	  case "001000":
-			result = first | second;
+			result = RS | RT;
 			break;
 	  // ORI
 	  case "001001":
-		  	result = first | second;
+		  	result = RS | imm;
 			break;
 	  // XOR
 	  case "001010":
-			result = first ^ second;
+			result = RS ^ RT;
 			break;
 	  // XORI
 	  case "001011":
-		  	result = first ^ second;
+		  	result = RS ^ imm;
 			break;
+	  // LDW
+	  case "001100":
+			result = RS + imm;	  
+			break;
+	 // STW
+	  case "001101":
+		    result = RS + imm;
+		  	break;  
 	  // BEQ
 	  case "001110":
-		    if(first == second)
-		    	result = 1;
-		    else
-		    	result = 0;
+		    if(RS == RT)
+		    	Regs.setPC(imm);	    
 	  // BZ    
 	  case "001111":
-		   if(first == 0)
-		    	result = 1;
-		    else
-		    	result = 0;
+		   if(RS == 0)
+			   Regs.setPC(imm);
 	  // JR
 	  case "010000":
+		  Regs.setPC(RS);
 		  break;
 	  // HALT
 	  case "010001":
+		  halt = true;
 		  break;
 	  // unsupported
 	  default:
@@ -245,34 +234,43 @@ public class Pipeline {
 	  }
 	  
 	  inx.setResult(result);
-	  System.out.println("result is "+result);
+//	  System.out.println("result is "+result);
 	  
 	  return result;
   }
   
   //Store value in register (WB)
-  public void WriteBack(Instruction inx){
-	  int reg = Integer.parseInt(inx.getRD(),2);
-	  int value = inx.getResult();
+  public void WriteBack(Instruction inx){	  
+	  if(inx.getOpcode().compareTo("1011") < 0){
+		  int reg;
+		  if(inx.getType() == "R")
+			  reg = Integer.parseInt(inx.getOpC(),2);
+		  else
+			  reg = Integer.parseInt(inx.getRT(),2);
 	  
-	  Regs.setValue(reg, value);
+		  int value = inx.getResult();
+		  Regs.setValue(reg, value);
+	  }
 	  
   }
   
   // store or retrieve value from memory (MEM)
-  public void memoryAccess( Instruction inx){
+  public void memoryAccess(Instruction inx){
 	  String opcode = inx.getOpcode();
+	  int address = inx.getResult();
+	  
+	  int temp = this.Regs.getValue(Integer.parseInt(inx.getRT(), 2));
+	  String value = Integer.toString(temp, 2);
 	  
 	  // LDW
 	  if(opcode == "001100"){
-		  
+		  this.mem.fetchFromMem(address);
 	  }
-  			
+	  
 	  // STW
 	  if(opcode == "001101"){
-		  
-	  }
-  
+		  this.mem.setMemory(address, value);
+	  } 
   }
  
 }
