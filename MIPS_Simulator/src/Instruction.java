@@ -79,6 +79,7 @@ public class Instruction {
 	}
 	
 	public void printAll(){
+		System.out.println("INSTRUCTION DUMP");
 		System.out.println("ix is "+ix);
 		System.out.println("opcode is "+opcode);
 		System.out.println("type is "+type);

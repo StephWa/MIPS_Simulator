@@ -30,7 +30,7 @@ public class Registers {
 	
 	//Increments PC to point to next instruction in memory
 	public void incrementPC(){
-		PC=PC+32;
+		PC=PC+4;
 	}
 	
 	public void setPC(int i){
@@ -38,7 +38,7 @@ public class Registers {
 	}
 	
 	public void printAll(){
-		for(int j=0;j<32;j++){
+		for(int j=0;j<6;j++){
 			System.out.println("reg "+j+" = "+R[j]);
 		}
 	}

@@ -27,6 +27,7 @@ public class Memory {
 		String line;
 		while((line = reader.readLine())!=null)	{
 			String inx = Memory.ToBinary(line);
+//			String[] temp = inx.split("(?!^)");
 			String[] temp = inx.split("");
 			for(int i=0;i<temp.length;i++){
 				data[j] = Integer.parseInt(temp[i]);
@@ -47,8 +48,10 @@ public class Memory {
 	
 	public int[] fetchFromMem(int address){
 		int[] result = new int[32];
+//		System.out.println("mem fetch");
 		for(int i=0;i<32;i++){
-			result[i] = data[address+i];
+			result[i] = data[(address*8)+i];
+//			System.out.println(data[address+i]);
 		}
 
 		return result;
@@ -56,10 +59,20 @@ public class Memory {
 	
 	//Sets value of an address in memory
 	public void setMemory(int address,String value){
-		for(int i=0;i<value.length();i++){
-			data[address+i]=Integer.parseInt(String.valueOf(value.charAt(i)));
+//		System.out.println("in set memory inx is "+value);
+		StringBuilder sb = new StringBuilder();
+		for(int i=32-value.length();i>0;i--){
+			sb.append('0');
 		}
- 	}
+		sb.append(value);
+		value = sb.toString();
+		String[] Array = value.split("(?!^)");
+
+		for(int i=0;i<value.length();i++){
+		data[(address*8)+i]=Integer.parseInt(Array[i]);
+//		System.out.println(data[(address*8)+i]);
+		}
+	}
 	
 	public static String ToBinary(String line){
 		StringBuilder sb = new StringBuilder();
